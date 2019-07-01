@@ -246,6 +246,7 @@ function AltManager:ValidateReset()
 			char_table.worldboss = "-";
 			
 			char_table.islands = 0
+			char_table.islands_finished = false;
 			
 			char_table.conquest = 0;
 			char_table.uldir_normal = 0;
