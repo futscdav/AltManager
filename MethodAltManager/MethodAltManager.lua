@@ -3,12 +3,14 @@ local _, AltManager = ...;
 
 _G["AltManager"] = AltManager;
 
--- Made by: Qooning - Tarren Mill <Method>, 2017-2018
+-- Made by: Qooning - Tarren Mill <Method>, 2017-2019
 -- updates for Bfa by: Kabootzey - Tarren Mill <Ended Careers>, 2018
--- Last edit: 11/27/2018
+-- Last edit: 07/09/2019
+
+local Dialog = LibStub("LibDialog-1.0")
 
 --local sizey = 200;
-local sizey = 250;
+local sizey = 260;
 local instances_y_add = 85;
 local xoffset = 0;
 local yoffset = 150;
@@ -17,11 +19,13 @@ local addon = "MethodAltManager";
 local numel = table.getn;
 
 local per_alt_x = 120;
+local ilvl_text_size = 8;
+local remove_button_size = 12;
 
 local min_x_size = 300;
 
 local min_level = 120;
-local name_label = "Name"
+local name_label = "" -- Name
 local mythic_done_label = "Highest M+ done"
 local mythic_keystone_label = "Keystone"
 local seals_owned_label = "Seals owned"
@@ -38,7 +42,7 @@ local pearls_label = "Manapearls"
 local neck_label = "Neck level"
 local residuum_label = "Residuum"
 
-local VERSION = "1.4.0"
+local VERSION = "1.5.0"
 
 local dungeons = {
 	-- BFA
@@ -75,6 +79,12 @@ local function spairs(t, order)
             return keys[i], t[keys[i]]
         end
     end
+end
+
+local function true_numel(t)
+	local c = 0
+	for k, v in pairs(t) do c = c + 1 end
+	return c
 end
 
 function SlashCmdList.METHODALTMANAGER(cmd, editbox)
@@ -161,23 +171,30 @@ function AltManager:InitDB()
 	return t;
 end
 
+function AltManager:CalculateXSizeNoGuidCheck()
+	local alts = MethodAltManagerDB.alts;
+	return max((alts + 1) * per_alt_x, min_x_size)
+end
+
+function AltManager:CalculateXSize()
+	-- local alts = MethodAltManagerDB.alts;
+	-- -- HACK: DUE TO THE LOGIN DATA GLITCH, I HAVE TO CHECK IF CURRENT ALT IS NEW
+	-- local guid = UnitGUID('player');
+	-- if MethodAltManagerDB.data[guid] == nil then alts = alts + 1 end
+	-- return max((alts + 1) * per_alt_x, min_x_size)
+	return self:CalculateXSizeNoGuidCheck()
+end
+
 -- because of guid...
 function AltManager:OnLogin()
 	self:ValidateReset();
 	self:StoreData(self:CollectData());
-	
-	local alts = MethodAltManagerDB.alts;
-	
-	-- HACK: DUE TO THE LOGIN DATA GLITCH, I HAVE TO CHECK IF CURRENT ALT IS NEW
-	local guid = UnitGUID('player');
-	if MethodAltManagerDB.data[guid] == nil then alts = alts + 1 end
   
-	self.main_frame:SetSize(max((alts + 1) * per_alt_x, min_x_size), sizey);
+	self.main_frame:SetSize(self:CalculateXSize(), sizey);
 	self.main_frame.background:SetAllPoints();
 	
 	-- Create menus
-	
-	AltManager:CreateMenu();
+	AltManager:CreateContent();
 	AltManager:MakeTopBottomTextures(self.main_frame);
 	AltManager:MakeBorder(self.main_frame, 5);
 end
@@ -186,6 +203,11 @@ function AltManager:OnLoad()
 	self.main_frame:UnregisterEvent("ADDON_LOADED");
 	
 	MethodAltManagerDB = MethodAltManagerDB or self:InitDB();
+
+	if MethodAltManagerDB.alts ~= true_numel(MethodAltManagerDB.data) then
+		print("Altcount inconsistent, using", true_numel(MethodAltManagerDB.data))
+		MethodAltManagerDB.alts = true_numel(MethodAltManagerDB.data)
+	end
 
 	self.addon_loaded = true
 	C_MythicPlus.RequestRewards();
@@ -245,7 +267,7 @@ function AltManager:ValidateReset()
 			char_table.expires = self:GetNextWeeklyResetTime();
 			char_table.worldboss = "-";
 			
-			char_table.islands = 0
+			char_table.islands = 0;
 			char_table.islands_finished = false;
 			
 			char_table.conquest = 0;
@@ -289,6 +311,64 @@ function AltManager:RemoveCharactersByName(name)
 	print("Please reload ui to update the displayed info.")
 
 	-- things wont be redrawn
+end
+
+function AltManager:RemoveCharacterByGuid(index)
+	local db = MethodAltManagerDB;
+
+	if db.data[index] == nil then return end
+
+	local name = db.data[index].name
+	Dialog:Register("AltManagerRemoveCharacterDialog", {
+		text = "Are you sure you want to remove " .. name .. " from the list?",
+		width = 500,
+		on_show = function(self, data) 
+		end,
+		buttons = {
+			{ text = "Delete", 
+			  on_click = function()
+					if db.data[index] == nil then return end
+					db.alts = db.alts - 1;
+					db.data[index] = nil
+					-- print("Deleting character guid", index)
+					self.main_frame:SetSize(self:CalculateXSizeNoGuidCheck(), sizey);
+					if self.main_frame.alt_columns ~= nil then
+						-- Hide the last col
+						-- find the correct frame to hide
+						local count = #self.main_frame.alt_columns
+						for j = 0,count-1 do
+							if self.main_frame.alt_columns[count-j]:IsShown() then
+								self.main_frame.alt_columns[count-j]:Hide()
+								-- also for instances
+								if self.instances_unroll ~= nil and self.instances_unroll.alt_columns ~= nil and self.instances_unroll.alt_columns[count-j] ~= nil then
+									self.instances_unroll.alt_columns[count-j]:Hide()
+								end
+								break
+							end
+						end
+						
+						-- and hide the remove button
+						if self.main_frame.remove_buttons ~= nil and self.main_frame.remove_buttons[index] ~= nil then
+							self.main_frame.remove_buttons[index]:Hide()
+						end
+					end
+					self:UpdateStrings()
+					-- it's not simple to update the instances text with current design, so hide it and let the click do update
+					if self.instances_unroll ~= nil and self.instances_unroll.state == "open" then
+						self:CloseInstancesUnroll()
+						self.instances_unroll.state = "closed";
+					end
+				end},
+			{ text = "Cancel", }
+		},	
+		show_while_dead = true,
+		hide_on_escape = true,
+	})
+	if Dialog:ActiveDialog("AltManagerRemoveCharacterDialog") then
+		Dialog:Dismiss("AltManagerRemoveCharacterDialog")
+	end
+	Dialog:Spawn("AltManagerRemoveCharacterDialog", {string = string})
+
 end
 
 function QuestUtils_GetCurrentQuestLineQuest(questLineID)
@@ -618,7 +698,7 @@ function AltManager:CollectData(do_artifact)
 	return char_table;
 end
 
-function AltManager:PopulateStrings()
+function AltManager:UpdateStrings()
 	local font_height = 20;
 	local db = MethodAltManagerDB;
 	
@@ -636,8 +716,9 @@ function AltManager:PopulateStrings()
 		local anchor_frame = self.main_frame.alt_columns[alt] or CreateFrame("Button", nil, self.main_frame);
 		if not self.main_frame.alt_columns[alt] then
 			self.main_frame.alt_columns[alt] = anchor_frame;
+			self.main_frame.alt_columns[alt].guid = alt_guid
+			anchor_frame:SetPoint("TOPLEFT", self.main_frame, "TOPLEFT", per_alt_x * alt, -1);
 		end
-		anchor_frame:SetPoint("TOPLEFT", self.main_frame, "TOPLEFT", per_alt_x * alt, -1);
 		anchor_frame:SetSize(per_alt_x, sizey);
 		-- init table for fontstring storage
 		self.main_frame.alt_columns[alt].label_columns = self.main_frame.alt_columns[alt].label_columns or {};
@@ -647,7 +728,7 @@ function AltManager:PopulateStrings()
 		for column_iden, column in spairs(self.columns_table, function(t, a, b) return t[a].order < t[b].order end) do
 			-- only display data with values
 			if type(column.data) == "function" then
-				local current_row = label_columns[i] or self:CreateFontFrame(self.main_frame, per_alt_x, column.font_height or font_height, anchor_frame, -(i - 1) * font_height, column.data(alt_data), "CENTER");
+				local current_row = label_columns[i] or self:CreateFontFrame(anchor_frame, per_alt_x, column.font_height or font_height, anchor_frame, -(i - 1) * font_height, column.data(alt_data), "CENTER");
 				-- insert it into storage if just created
 				if not self.main_frame.alt_columns[alt].label_columns[i] then
 					self.main_frame.alt_columns[alt].label_columns[i] = current_row;
@@ -658,12 +739,24 @@ function AltManager:PopulateStrings()
 				end
 				current_row:SetText(column.data(alt_data))
 				if column.font then
-					current_row:GetFontString():SetFont(column.font, 8)
+					current_row:GetFontString():SetFont(column.font, ilvl_text_size)
 				else
 					--current_row:GetFontString():SetFont("Fonts\\FRIZQT__.TTF", 14)
 				end
 				if column.justify then
 					current_row:GetFontString():SetJustifyV(column.justify);
+				end
+				if column.remove_button ~= nil then
+					self.main_frame.remove_buttons = self.main_frame.remove_buttons or {}
+					local extra = self.main_frame.remove_buttons[alt_data.guid] or column.remove_button(alt_data)
+					if self.main_frame.remove_buttons[alt_data.guid] == nil then 
+						self.main_frame.remove_buttons[alt_data.guid] = extra
+					end
+					extra:SetParent(current_row)
+					extra:SetPoint("TOPRIGHT", current_row, "TOPRIGHT", -18, 2 );
+					extra:SetPoint("BOTTOMRIGHT", current_row, "TOPRIGHT", -18, -remove_button_size + 2);
+					extra:SetFrameLevel(current_row:GetFrameLevel() + 1)
+					extra:Show();
 				end
 			end
 			i = i + 1
@@ -673,7 +766,79 @@ function AltManager:PopulateStrings()
 	
 end
 
-function AltManager:CreateMenu()
+function AltManager:UpdateInstanceStrings(my_rows, font_height)
+	self.instances_unroll.alt_columns = self.instances_unroll.alt_columns or {};
+	local alt = 0
+	local db = MethodAltManagerDB;
+	for alt_guid, alt_data in spairs(db.data, function(t, a, b) return t[a].ilevel > t[b].ilevel end) do
+		alt = alt + 1
+		-- create the frame to which all the fontstrings anchor
+		local anchor_frame = self.instances_unroll.alt_columns[alt] or CreateFrame("Button", nil, self.main_frame.alt_columns[alt]);
+		if not self.instances_unroll.alt_columns[alt] then
+			self.instances_unroll.alt_columns[alt] = anchor_frame;
+		end
+		anchor_frame:SetPoint("TOPLEFT", self.instances_unroll.unroll_frame, "TOPLEFT", per_alt_x * alt, -1);
+		anchor_frame:SetSize(per_alt_x, instances_y_add);
+		-- init table for fontstring storage
+		self.instances_unroll.alt_columns[alt].label_columns = self.instances_unroll.alt_columns[alt].label_columns or {};
+		local label_columns = self.instances_unroll.alt_columns[alt].label_columns;
+		-- create / fill fontstrings
+		local i = 1;
+		for column_iden, column in spairs(my_rows, function(t, a, b) return t[a].order < t[b].order end) do
+			local current_row = label_columns[i] or self:CreateFontFrame(anchor_frame, per_alt_x, column.font_height or font_height, anchor_frame, -(i - 1) * font_height, column.data(alt_data), "CENTER");
+			-- insert it into storage if just created
+			if not self.instances_unroll.alt_columns[alt].label_columns[i] then
+				self.instances_unroll.alt_columns[alt].label_columns[i] = current_row;
+			end
+			current_row:SetText(column.data(alt_data)) -- fills data
+			i = i + 1
+		end
+		-- hotfix visibility
+		if anchor_frame:GetParent():IsShown() then anchor_frame:Show() else anchor_frame:Hide() end
+	end
+end
+
+function AltManager:OpenInstancesUnroll(my_rows, button) 
+	-- do unroll
+	self.instances_unroll.unroll_frame = self.instances_unroll.unroll_frame or CreateFrame("Button", nil, self.main_frame);
+	self.instances_unroll.unroll_frame:SetSize(per_alt_x, instances_y_add);
+	self.instances_unroll.unroll_frame:SetPoint("TOPLEFT", self.main_frame, "TOPLEFT", 4, self.main_frame.lowest_point - 10);
+	self.instances_unroll.unroll_frame:Show();
+
+	local font_height = 20;
+	-- create the rows for the unroll
+	if not self.instances_unroll.labels then
+		self.instances_unroll.labels = {};
+		local i = 1
+		for row_iden, row in spairs(my_rows, function(t, a, b) return t[a].order < t[b].order end) do
+			if row.label then
+				local label_row = self:CreateFontFrame(self.instances_unroll.unroll_frame, per_alt_x, font_height, self.instances_unroll.unroll_frame, -(i-1)*font_height, row.label..":", "RIGHT");
+				table.insert(self.instances_unroll.labels, label_row)
+			end
+			i = i + 1
+		end
+	end
+
+	-- populate it for alts
+	self:UpdateInstanceStrings(my_rows, font_height)
+
+	-- fixup the background
+	self.main_frame:SetSize(self:CalculateXSizeNoGuidCheck(), sizey + instances_y_add);
+	self.main_frame.background:SetAllPoints();
+
+end
+
+function AltManager:CloseInstancesUnroll()
+	-- do rollup
+	self.main_frame:SetSize(self:CalculateXSizeNoGuidCheck(), sizey);
+	self.main_frame.background:SetAllPoints();
+	self.instances_unroll.unroll_frame:Hide();
+	for k, v in pairs(self.instances_unroll.alt_columns) do
+		v:Hide()
+	end
+end
+
+function AltManager:CreateContent()
 
 	-- Close button
 	self.main_frame.closeButton = CreateFrame("Button", "CloseButton", self.main_frame, "UIPanelCloseButton");
@@ -694,6 +859,7 @@ function AltManager:CreateMenu()
 			data = function(alt_data) return string.format("%.2f (%d)", alt_data.ilevel or 0, alt_data.neck_level or 0) end,
 			justify = "TOP",
 			font = "Fonts\\FRIZQT__.TTF",
+			remove_button = function(alt_data) return self:CreateRemoveButton(function() AltManager:RemoveCharacterByGuid(alt_data.guid) end) end
 		},
 		mplus = {
 			order = 3,
@@ -744,7 +910,7 @@ function AltManager:CreateMenu()
 		islands = {
 			order = 11,
 			label = islands_label,
-			data = function(alt_data) return (alt_data.islands_finished and "Capped") or ((alt_data.islands and tostring(alt_data.islands)) or "?") .. "/ 4K"  end,
+			data = function(alt_data) return (alt_data.islands_finished and "Capped") or ((alt_data.islands and tostring(alt_data.islands)) or "?") .. "/ 36K"  end,
 		},
 		dummy_line = {
 			order = 12,
@@ -759,66 +925,13 @@ function AltManager:CreateMenu()
 				self.instances_unroll = self.instances_unroll or {};
 				self.instances_unroll.state = self.instances_unroll.state or "closed";
 				if self.instances_unroll.state == "closed" then
-					-- do unroll
-					self.instances_unroll.unroll_frame = self.instances_unroll.unroll_frame or CreateFrame("Button", nil, self.main_frame);
-					self.instances_unroll.unroll_frame:SetSize(per_alt_x, instances_y_add);
-					self.instances_unroll.unroll_frame:SetPoint("TOPLEFT", self.main_frame, "TOPLEFT", 4, self.main_frame.lowest_point - 10);
-					self.instances_unroll.unroll_frame:Show();
-					
-					local font_height = 20;
-					-- create the rows for the unroll
-					if not self.instances_unroll.labels then
-						self.instances_unroll.labels = {};
-						local i = 1
-						for row_iden, row in spairs(my_rows, function(t, a, b) return t[a].order < t[b].order end) do
-							if row.label then
-								local label_row = self:CreateFontFrame(self.instances_unroll.unroll_frame, per_alt_x, font_height, self.instances_unroll.unroll_frame, -(i-1)*font_height, row.label..":", "RIGHT");
-								table.insert(self.instances_unroll.labels, label_row)
-							end
-							i = i + 1
-						end
-					end
-					
-					-- populate it for alts
-					self.instances_unroll.alt_columns = self.instances_unroll.alt_columns or {};
-					local alt = 0
-					local db = MethodAltManagerDB;
-					for alt_guid, alt_data in spairs(db.data, function(t, a, b) return t[a].ilevel > t[b].ilevel end) do
-						alt = alt + 1
-						-- create the frame to which all the fontstrings anchor
-						local anchor_frame = self.instances_unroll.alt_columns[alt] or CreateFrame("Button", nil, self.instances_unroll.unroll_frame);
-						if not self.instances_unroll.alt_columns[alt] then
-							self.instances_unroll.alt_columns[alt] = anchor_frame;
-						end
-						anchor_frame:SetPoint("TOPLEFT", self.instances_unroll.unroll_frame, "TOPLEFT", per_alt_x * alt, -1);
-						anchor_frame:SetSize(per_alt_x, instances_y_add);
-						-- init table for fontstring storage
-						self.instances_unroll.alt_columns[alt].label_columns = self.instances_unroll.alt_columns[alt].label_columns or {};
-						local label_columns = self.instances_unroll.alt_columns[alt].label_columns;
-						-- create / fill fontstrings
-						local i = 1;
-						for column_iden, column in spairs(my_rows, function(t, a, b) return t[a].order < t[b].order end) do
-							local current_row = label_columns[i] or self:CreateFontFrame(self.instances_unroll.unroll_frame, per_alt_x, column.font_height or font_height, anchor_frame, -(i - 1) * font_height, column.data(alt_data), "CENTER");
-							-- insert it into storage if just created
-							if not self.instances_unroll.alt_columns[alt].label_columns[i] then
-								self.instances_unroll.alt_columns[alt].label_columns[i] = current_row;
-							end
-							current_row:SetText(column.data(alt_data))
-							i = i + 1
-						end
-					end
-
-					-- fixup the background
-					self.main_frame:SetSize(max((alt + 1) * per_alt_x, min_x_size), sizey + instances_y_add);
-					self.main_frame.background:SetAllPoints();
-
+					self:OpenInstancesUnroll(my_rows)
+					-- update ui
 					button:SetText("Instances <<");
 					self.instances_unroll.state = "open";
 				else
-					-- do rollup
-					self.main_frame:SetSize(max((MethodAltManagerDB.alts + 1) * per_alt_x, min_x_size), sizey);
-					self.main_frame.background:SetAllPoints();
-					self.instances_unroll.unroll_frame:Hide();
+					self:CloseInstancesUnroll()
+					-- update ui
 					button:SetText("Instances >>");
 					self.instances_unroll.state = "closed";
 				end
@@ -854,15 +967,15 @@ function AltManager:CreateMenu()
 	local i = 1;
 	for row_iden, row in spairs(self.columns_table, function(t, a, b) return t[a].order < t[b].order end) do
 		if row.label then
-			local label_row = self:CreateFontFrame(self.main_frame, per_alt_x, font_height, label_column, -(i-1)*font_height, row.label..":", "RIGHT");
+			local label_row = self:CreateFontFrame(self.main_frame, per_alt_x, font_height, label_column, -(i-1)*font_height, row.label~="" and row.label..":" or " ", "RIGHT");
 			self.main_frame.lowest_point = -(i-1)*font_height;
 		end
 		if row.data == "unroll" then
 			-- create a button that will unroll it
 			local unroll_button = CreateFrame("Button", "UnrollButton", self.main_frame, "UIPanelButtonTemplate");
 			unroll_button:SetText(row.name);
-			unroll_button:SetFrameStrata("HIGH");
-			--unroll_button:SetFrameLevel(self.main_frame:GetFrameLevel() - 1);
+			--unroll_button:SetFrameStrata("HIGH");
+			unroll_button:SetFrameLevel(self.main_frame:GetFrameLevel() + 2)
 			unroll_button:SetSize(unroll_button:GetTextWidth() + 20, 25);
 			unroll_button:SetPoint("BOTTOMRIGHT", self.main_frame, "TOPLEFT", 4 + per_alt_x, -(i-1)*font_height-10);
 			unroll_button:SetScript("OnClick", function() row.unroll_function(unroll_button, row.rows) end);
@@ -894,7 +1007,26 @@ end
 function AltManager:ShowInterface()
 	self.main_frame:Show();
 	self:StoreData(self:CollectData())
-	self:PopulateStrings();
+	self:UpdateStrings();
+end
+
+function AltManager:CreateRemoveButton(func)
+	local frame = CreateFrame("Button", nil, nil)
+	frame:ClearAllPoints()
+	frame:SetScript("OnClick", function() func() end);
+	self:MakeRemoveTexture(frame)
+	frame:SetWidth(remove_button_size)
+	return frame
+end
+
+function AltManager:MakeRemoveTexture(frame)
+	if frame.remove_tex == nil then
+		frame.remove_tex = frame:CreateTexture(nil, "BACKGROUND")
+		frame.remove_tex:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+		frame.remove_tex:SetAllPoints()
+		frame.remove_tex:Show();
+	end
+	return frame
 end
 
 function AltManager:MakeTopBottomTextures(frame)
@@ -926,12 +1058,14 @@ function AltManager:MakeTopBottomTextures(frame)
 	frame.bottomPanel:SetColorTexture(0, 0, 0, 0.7);
 	frame.bottomPanel:ClearAllPoints();
 	frame.bottomPanel:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, 0);
+	frame.bottomPanel:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, 0);
 	frame.bottomPanel:SetSize(frame:GetWidth(), 30);
 	frame.bottomPanel:SetDrawLayer("ARTWORK", 7);
 
 	frame.topPanel:ClearAllPoints();
 	frame.topPanel:SetSize(frame:GetWidth(), 30);
 	frame.topPanel:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 0);
+	frame.topPanel:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", 0, 0);
 
 	frame:SetMovable(true);
 	frame.topPanel:EnableMouse(true);
