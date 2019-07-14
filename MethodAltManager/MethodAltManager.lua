@@ -42,7 +42,7 @@ local pearls_label = "Manapearls"
 local neck_label = "Neck level"
 local residuum_label = "Residuum"
 
-local VERSION = "1.5.0"
+local VERSION = "1.5.1"
 
 local dungeons = {
 	-- BFA
@@ -371,21 +371,23 @@ function AltManager:RemoveCharacterByGuid(index)
 
 end
 
-function QuestUtils_GetCurrentQuestLineQuest(questLineID)
-    local quests = C_QuestLine.GetQuestLineQuests(questLineID);
-    local currentQuestID = 0;
-    for i, questID in ipairs(quests) do
-        if C_QuestLog.IsOnQuest(questID) then
-            currentQuestID = questID;
-            break;
-        end
-    end
-    return currentQuestID;
-end
+local get_current_questline_quest = QuestUtils_GetCurrentQuestLineQuest
+
+-- function QuestUtils_GetCurrentQuestLineQuest(questLineID)
+-- 	local quests = C_QuestLine.GetQuestLineQuests(questLineID);
+-- 	local currentQuestID = 0;
+-- 	for i, questID in ipairs(quests) do
+-- 		if C_QuestLog.IsOnQuest(questID) then
+-- 			currentQuestID = questID;
+-- 			break;
+-- 		end
+-- 	end
+-- 	return currentQuestID;
+-- end
 
 function getConquestCap()
     local CONQUEST_QUESTLINE_ID = 782;
-    local currentQuestID = QuestUtils_GetCurrentQuestLineQuest(CONQUEST_QUESTLINE_ID);
+    local currentQuestID = get_current_questline_quest(CONQUEST_QUESTLINE_ID);
 
     -- if not on a current quest that means all caught up for this week
     if currentQuestID == 0 then
