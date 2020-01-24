@@ -30,7 +30,9 @@ local mythic_done_label = "Highest M+ done"
 local mythic_keystone_label = "Keystone"
 local seals_owned_label = "Seals owned"
 local seals_bought_label = "Seals obtained"
+local vessels_of_horrific_visions_label = "Vessels Owned"
 local artifact_reaserch_label = "AK level"
+local coalescing_visions_label = "Coalescing Visions"
 local artifact_research_time_label = "Next level in"
 local depleted_label = "Depleted"
 local nightbane_label = "Nightbane"
@@ -42,7 +44,7 @@ local pearls_label = "Manapearls"
 local neck_label = "Neck level"
 local residuum_label = "Residuum"
 
-local VERSION = "1.5.1"
+local VERSION = "1.5.2"
 
 local dungeons = {
 	-- BFA
@@ -55,7 +57,8 @@ local dungeons = {
 	[250] = "Seth",
 	[251] = "UR",
 	[252] = "SotS",
-	[353] = "SoB"
+	[353] = "SoB",
+	[370] = "Mech:W"
  };
 
 
@@ -168,6 +171,7 @@ end
 function AltManager:InitDB()
 	local t = {};
 	t.alts = 0;
+	t.data = {};
 	return t;
 end
 
@@ -459,11 +463,13 @@ function AltManager:CollectData(do_artifact)
 	local expire = nil;
 	local level = nil;
 	local seals = nil;
+	local coalescing_visions = 0;
 	local seals_bought = nil;
 	local artifact_level = nil;
 	local next_research = nil;
 	local highest_mplus = 0;
 	local depleted = false;
+	local vessels = 0
 
 	local guid = UnitGUID('player');
 
@@ -491,12 +497,17 @@ function AltManager:CollectData(do_artifact)
 		local slots = GetContainerNumSlots(container)
 		for slot=1, slots do
 			local _, _, _, _, _, _, slotLink, _, _, slotItemID = GetContainerItemInfo(container, slot)
+			-- print(slotLink)
 			--if slotItemID then print(slotItemID, GetItemInfo(slotItemID)) end
 			
+			--	might as well check if the item is a vessel of horrific vision
+			if slotItemID == 173363 then
+				vessels = vessels + 1
+			end
 			if slotItemID == 158923 then
 				local itemString = slotLink:match("|Hkeystone:([0-9:]+)|h(%b[])|h")
 				local info = { strsplit(":", itemString) }
-        -- print(info[0], info[1], info[2], info[3], info[4])
+				-- print(info[0], info[1], info[2], info[3], info[4])
 				-- scan tooltip for depleted
 				self.main_frame.scan_tooltip:SetOwner(UIParent, 'ANCHOR_NONE');
 				self.main_frame.scan_tooltip:SetBagItem(container, slot);
@@ -579,6 +590,7 @@ function AltManager:CollectData(do_artifact)
 	end
 	
 	_, seals = GetCurrencyInfo(1580);
+	_, coalescing_visions = GetCurrencyInfo(1755);
 	
 	seals_bought = 0
 	local gold_1 = IsQuestFlaggedCompleted(52834)
@@ -666,6 +678,8 @@ function AltManager:CollectData(do_artifact)
 	char_table.ilevel = ilevel;
 	char_table.seals = seals;
 	char_table.seals_bought = seals_bought;
+	char_table.vessels = vessels;
+	char_table.coalescing_visions = coalescing_visions;
 	char_table.dungeon = dungeon;
 	char_table.level = level;
 	char_table.highest_mplus = highest_mplus;
@@ -883,9 +897,19 @@ function AltManager:CreateContent()
 			label = seals_bought_label,
 			data = function(alt_data) return tostring(alt_data.seals_bought) end,
 		},
+		vessels = {
+			order = 6.5,
+			label = vessels_of_horrific_visions_label,
+			data = function(alt_data) return tostring(alt_data.vessels) end,
+		},
+		coalascing_visions = {
+			order = 6.6,
+			label = coalescing_visions_label,
+			data = function(alt_data) return tostring(alt_data.coalescing_visions) end,
+		},
 		residuum = {
 			order = 7,
-			label = residuum_label,
+			 label = residuum_label,
 			data = function(alt_data) return alt_data.residuum and tostring(alt_data.residuum) or "0" end,
 		},
 		conquest_cap = {
