@@ -10,7 +10,7 @@ _G["AltManager"] = AltManager;
 local Dialog = LibStub("LibDialog-1.0")
 
 --local sizey = 200;
-local sizey = 260;
+local sizey = 315;
 local instances_y_add = 85;
 local xoffset = 0;
 local yoffset = 150;
@@ -30,9 +30,10 @@ local mythic_done_label = "Highest M+ done"
 local mythic_keystone_label = "Keystone"
 local seals_owned_label = "Seals owned"
 local seals_bought_label = "Seals obtained"
-local vessels_of_horrific_visions_label = "Vessels Owned"
+local vessels_of_horrific_visions_label = "Vessels"
 local artifact_reaserch_label = "AK level"
 local coalescing_visions_label = "Coalescing Visions"
+local mementos_label = "Mementos"
 local artifact_research_time_label = "Next level in"
 local depleted_label = "Depleted"
 local nightbane_label = "Nightbane"
@@ -46,6 +47,8 @@ local residuum_label = "Residuum"
 
 local VERSION = "1.5.2"
 
+-- if Blizzard keeps supporting old api, get the IDs from
+-- C_ChallengeMode.GetMapTable() and names from C_ChallengeMode.GetMapUIInfo(id)
 local dungeons = {
 	-- BFA
 	[244] = "AD",
@@ -58,7 +61,8 @@ local dungeons = {
 	[251] = "UR",
 	[252] = "SotS",
 	[353] = "SoB",
-	[370] = "Mech:W"
+	[369] = "Mech:Junk",
+	[370] = "Mech:Shop",
  };
 
 
@@ -632,6 +636,11 @@ function AltManager:CollectData(do_artifact)
 			if difficulty == "Heroic" then ep_heroic = killed_bosses end
 			if difficulty == "Mythic" then ep_mythic = killed_bosses end
 		end
+		if name == C_Map.GetMapInfo(1580).name and reset > 0 then -- is it okay to use any Nyalotha id?
+			if difficulty == "Normal" then nyalotha_normal = killed_bosses end
+			if difficulty == "Heroic" then nyalotha_heroic = killed_bosses end
+			if difficulty == "Mythic" then nyalotha_mythic = killed_bosses end
+		end
 	end
 	
 	
@@ -661,6 +670,9 @@ function AltManager:CollectData(do_artifact)
 
 	local _, pearls = GetCurrencyInfo(1721);
 	local _, residuum = GetCurrencyInfo(1718);
+	local _, corrupted_mementos = GetCurrencyInfo(1719); -- jebaited with 1744 id, which is probably the "in vision" currency
+
+	-- /run for i=0,20000 do n,a = GetCurrencyInfo(i); if a == 1365 then print(i) end end
 
 	local location = C_AzeriteItem.FindActiveAzeriteItem()
 	local neck_level
@@ -689,6 +701,7 @@ function AltManager:CollectData(do_artifact)
 	char_table.islands_finished = islands_finished;
 	char_table.pearls = pearls
 	char_table.residuum = residuum
+	char_table.corrupted_mementos = corrupted_mementos
 	char_table.neck_level = neck_level
 	
 
@@ -703,6 +716,10 @@ function AltManager:CollectData(do_artifact)
 	char_table.ep_normal = ep_normal;
 	char_table.ep_heroic = ep_heroic;
 	char_table.ep_mythic = ep_mythic;
+
+	char_table.nyalotha_normal = nyalotha_normal;
+	char_table.nyalotha_heroic = nyalotha_heroic;
+	char_table.nyalotha_mythic = nyalotha_mythic;
 
 	char_table.order_resources = order_resources;
 	char_table.veiled_argunite = veiled_argunite;
@@ -897,15 +914,25 @@ function AltManager:CreateContent()
 			label = seals_bought_label,
 			data = function(alt_data) return tostring(alt_data.seals_bought) end,
 		},
+		fake_just_for_offset = {
+			order = 6.1,
+			label = "",
+			data = function(alt_data) return " " end,
+		},
 		vessels = {
 			order = 6.5,
 			label = vessels_of_horrific_visions_label,
-			data = function(alt_data) return tostring(alt_data.vessels) end,
+			data = function(alt_data) return tostring(alt_data.vessels or "0") end,
 		},
 		coalascing_visions = {
 			order = 6.6,
 			label = coalescing_visions_label,
-			data = function(alt_data) return tostring(alt_data.coalescing_visions) end,
+			data = function(alt_data) return tostring(alt_data.coalescing_visions or "0") end,
+		},
+		corrupted_mementos = {
+			order = 6.7,
+			label = mementos_label,
+			data = function(alt_data) return tostring(alt_data.corrupted_mementos or "0") end,
 		},
 		residuum = {
 			order = 7,
@@ -922,12 +949,13 @@ function AltManager:CreateContent()
 			label = resources_label,
 			data = function(alt_data) return alt_data.order_resources and tostring(alt_data.order_resources) or "0" end,
 		},
-		pearls = {
-			order = 9.5,
-			label = pearls_label,
-			data = function(alt_data) return alt_data.pearls and tostring(alt_data.pearls) or "0" end,
-		},
 		-- sort of became irrelevant for now
+		-- pearls = {
+		-- 	order = 9.5,
+		-- 	label = pearls_label,
+		-- 	data = function(alt_data) return alt_data.pearls and tostring(alt_data.pearls) or "0" end,
+		-- },
+
 		-- worldbosses = {
 		-- 	order = 10,
 		-- 	label = worldboss_label,
@@ -964,19 +992,24 @@ function AltManager:CreateContent()
 			end,
 			rows = {
 				uldir = {
-					order = 1,
+					order = 4,
 					label = "Uldir",
 					data = function(alt_data) return self:MakeRaidString(alt_data.uldir_normal, alt_data.uldir_heroic, alt_data.uldir_mythic) end
 				},
 				dazaralor = {
-					order = 2,
+					order = 3,
 					label = "Battle for Dazar'alor",
 					data = function(alt_data) return self:MakeRaidString(alt_data.bod_normal, alt_data.bod_heroic, alt_data.bod_mythic) end
 				},
 				eternal_palace = {
-					order = 3,
+					order = 2,
 					label = "The Eternal Palace",
 					data = function(alt_data) return self:MakeRaidString(alt_data.ep_normal, alt_data.ep_heroic, alt_data.ep_mythic) end
+				},
+				nyalotha = {
+					order = 1,
+					label = "Ny'alotha",
+					data = function(alt_data) return self:MakeRaidString(alt_data.nyalotha_normal, alt_data.nyalotha_heroic, alt_data.nyalotha_mythic) end
 				}
 			}
 		}
