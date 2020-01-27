@@ -45,7 +45,7 @@ local pearls_label = "Manapearls"
 local neck_label = "Neck level"
 local residuum_label = "Residuum"
 
-local VERSION = "1.5.2"
+local VERSION = "1.6.0"
 
 -- if Blizzard keeps supporting old api, get the IDs from
 -- C_ChallengeMode.GetMapTable() and names from C_ChallengeMode.GetMapUIInfo(id)
@@ -129,7 +129,7 @@ do
 	main_frame.background:SetDrawLayer("ARTWORK", 1);
 	main_frame.background:SetColorTexture(0, 0, 0, 0.5);
 	
-	main_frame.scan_tooltip = CreateFrame('GameTooltip', 'DepletedTooltipScan', UIParent, 'GameTooltipTemplate');
+	-- main_frame.scan_tooltip = CreateFrame('GameTooltip', 'DepletedTooltipScan', UIParent, 'GameTooltipTemplate');
 	
 
 	-- Set frame position
@@ -291,6 +291,9 @@ function AltManager:ValidateReset()
 			char_table.ep_heroic = 0;
 			char_table.ep_mythic = 0;
 
+			char_table.nyalotha_normal = 0;
+			char_table.nyalotha_heroic = 0;
+			char_table.nyalotha_mythic = 0;
 
 		end
 	end
@@ -511,17 +514,10 @@ function AltManager:CollectData(do_artifact)
 			if slotItemID == 158923 then
 				local itemString = slotLink:match("|Hkeystone:([0-9:]+)|h(%b[])|h")
 				local info = { strsplit(":", itemString) }
-				-- print(info[0], info[1], info[2], info[3], info[4])
-				-- scan tooltip for depleted
-				self.main_frame.scan_tooltip:SetOwner(UIParent, 'ANCHOR_NONE');
-				self.main_frame.scan_tooltip:SetBagItem(container, slot);
-				local regions = self.main_frame.scan_tooltip:GetRegions();
-				self.main_frame.scan_tooltip:Hide();
-				--local mapname = C_ChallengeMode.GetMapInfo(info[1]);
 				dungeon = tonumber(info[2])
-				if not dungeon then print("MethodAltManager - Parse Failure, please let Qoning know that this happened."); end
+				if not dungeon then dungeon = nil end
 				level = tonumber(info[3])
-				if not level then print("MethodAltManager - Parse Failure, please let Qoning know that this happened."); end
+				if not level then level = nil end
 				expire = tonumber(info[4])
 				keystone_found = true;
 			end
@@ -617,33 +613,43 @@ function AltManager:CollectData(do_artifact)
 	local uldir_lfr, uldir_normal, uldir_heroic, uldir_mythic = 0;
 
 	local saves = GetNumSavedInstances();
+	local normal_difficulty = 14
+	local heroic_difficulty = 15
+	local mythic_difficulty = 16
 	for i = 1, saves do
-		local name, _, reset, _, _, _, _, _, _, difficulty, bosses, killed_bosses = GetSavedInstanceInfo(i);
+		local name, _, reset, difficulty, _, _, _, _, _, _, bosses, killed_bosses = GetSavedInstanceInfo(i);
 
 		-- check for raids
 		if name == C_Map.GetMapInfo(1148).name and reset > 0 then
-			if difficulty == "Normal" then uldir_normal = killed_bosses end
-			if difficulty == "Heroic" then uldir_heroic = killed_bosses end
-			if difficulty == "Mythic" then uldir_mythic = killed_bosses end
+			if difficulty == normal_difficulty then uldir_normal = killed_bosses end
+			if difficulty == heroic_difficulty then uldir_heroic = killed_bosses end
+			if difficulty == mythic_difficulty then uldir_mythic = killed_bosses end
 		end
 		if name == C_Map.GetMapInfo(1352).name and reset > 0 then
-			if difficulty == "Normal" then bod_normal = killed_bosses end
-			if difficulty == "Heroic" then bod_heroic = killed_bosses end
-			if difficulty == "Mythic" then bod_mythic = killed_bosses end
+			if difficulty == normal_difficulty then bod_normal = killed_bosses end
+			if difficulty == heroic_difficulty then bod_heroic = killed_bosses end
+			if difficulty == mythic_difficulty then bod_mythic = killed_bosses end
 		end
 		if name == C_Map.GetMapInfo(1512).name and reset > 0 then
-			if difficulty == "Normal" then ep_normal = killed_bosses end
-			if difficulty == "Heroic" then ep_heroic = killed_bosses end
-			if difficulty == "Mythic" then ep_mythic = killed_bosses end
+			if difficulty == normal_difficulty then ep_normal = killed_bosses end
+			if difficulty == heroic_difficulty then ep_heroic = killed_bosses end
+			if difficulty == mythic_difficulty then ep_mythic = killed_bosses end
 		end
-		if name == C_Map.GetMapInfo(1580).name and reset > 0 then -- is it okay to use any Nyalotha id?
-			if difficulty == "Normal" then nyalotha_normal = killed_bosses end
-			if difficulty == "Heroic" then nyalotha_heroic = killed_bosses end
-			if difficulty == "Mythic" then nyalotha_mythic = killed_bosses end
+		-- hack that may not work for other localizations
+		-- I can't find any reference to the full name in the API, but the saved info returns the full name
+		local nyalotha_lfg_name = GetLFGDungeonInfo(2033)
+		if name == nyalotha_lfg_name and reset > 0 then -- is it okay to use any Nyalotha id? 2217
+			if difficulty == normal_difficulty then nyalotha_normal = killed_bosses end
+			if difficulty == heroic_difficulty then nyalotha_heroic = killed_bosses end
+			if difficulty == mythic_difficulty then nyalotha_mythic = killed_bosses end
 		end
 	end
 	
-	
+	-- Can find map info quickly like this
+	-- /run for i=1,GetNumSavedInstances() do print(GetSavedInstanceInfo(i)) end
+	-- /run for i=0,20000 do if C_Map.GetMapInfo(i) then if C_Map.GetMapInfo(i).name == "Ny'alotha, the Waking City" then print(i) end end end
+	-- /run for i=2000,2400 do if GetLFGDungeonInfo(i) then print(i, GetLFGDungeonInfo(i)) end end 
+
 	local worldbossquests = {
 		[52181] = "T'zane", 
 		[52169] = "Dunegorger Kraulok",
