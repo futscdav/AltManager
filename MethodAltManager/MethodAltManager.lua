@@ -10,7 +10,7 @@ _G["AltManager"] = AltManager;
 local Dialog = LibStub("LibDialog-1.0")
 
 --local sizey = 200;
-local sizey = 315;
+local sizey = 335;
 local instances_y_add = 85;
 local xoffset = 0;
 local yoffset = 150;
@@ -34,6 +34,7 @@ local vessels_of_horrific_visions_label = "Vessels"
 local artifact_reaserch_label = "AK level"
 local coalescing_visions_label = "Coalescing Visions"
 local mementos_label = "Mementos"
+local echoes_label = "Echoes"
 local artifact_research_time_label = "Next level in"
 local depleted_label = "Depleted"
 local nightbane_label = "Nightbane"
@@ -45,7 +46,7 @@ local pearls_label = "Manapearls"
 local neck_label = "Neck level"
 local residuum_label = "Residuum"
 
-local VERSION = "1.6.0"
+local VERSION = "1.6.1"
 
 -- if Blizzard keeps supporting old api, get the IDs from
 -- C_ChallengeMode.GetMapTable() and names from C_ChallengeMode.GetMapUIInfo(id)
@@ -676,6 +677,7 @@ function AltManager:CollectData(do_artifact)
 
 	local _, pearls = GetCurrencyInfo(1721);
 	local _, residuum = GetCurrencyInfo(1718);
+	local _, echoes = GetCurrencyInfo(1803);
 	local _, corrupted_mementos = GetCurrencyInfo(1719); -- jebaited with 1744 id, which is probably the "in vision" currency
 
 	-- /run for i=0,20000 do n,a = GetCurrencyInfo(i); if a == 1365 then print(i) end end
@@ -709,6 +711,7 @@ function AltManager:CollectData(do_artifact)
 	char_table.residuum = residuum
 	char_table.corrupted_mementos = corrupted_mementos
 	char_table.neck_level = neck_level
+	char_table.echoes = echoes
 	
 
 	char_table.uldir_normal = uldir_normal;
@@ -942,8 +945,13 @@ function AltManager:CreateContent()
 		},
 		residuum = {
 			order = 7,
-			 label = residuum_label,
+			label = residuum_label,
 			data = function(alt_data) return alt_data.residuum and tostring(alt_data.residuum) or "0" end,
+		},
+		echoes = {
+			order = 7.5,
+			label = echoes_label,
+			data = function(alt_data) return alt_data.echoes and tostring(alt_data.echoes) or "0" end,
 		},
 		conquest_cap = {
 			order = 8,
@@ -1114,7 +1122,7 @@ function AltManager:MakeTopBottomTextures(frame)
 		frame.topPanelString:SetJustifyV("CENTER")
 		frame.topPanelString:SetWidth(260)
 		frame.topPanelString:SetHeight(20)
-		frame.topPanelString:SetText("Method Alt Manager");
+		frame.topPanelString:SetText("Alt Manager");
 		frame.topPanelString:ClearAllPoints();
 		frame.topPanelString:SetPoint("CENTER", frame.topPanel, "CENTER", 0, 0);
 		frame.topPanelString:Show();
