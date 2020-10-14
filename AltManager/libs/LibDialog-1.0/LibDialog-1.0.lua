@@ -895,7 +895,10 @@ end
 function dialog_prototype:Reset()
     self:SetWidth(DEFAULT_DIALOG_WIDTH)
     self:SetHeight(DEFAULT_DIALOG_HEIGHT)
+
+    Mixin(self, BackdropTemplateMixin)
     self:SetBackdrop(DEFAULT_DIALOG_BACKDROP)
+    -- self:SetBackdrop(DEFAULT_DIALOG_BACKDROP)
 
     self:SetToplevel(true)
     self:EnableKeyboard(true)
