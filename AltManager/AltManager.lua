@@ -11,8 +11,8 @@ _G["AltManager"] = AltManager;
 local Dialog = LibStub("LibDialog-1.0")
 
 --local sizey = 200;
-local sizey = 335;
-local instances_y_add = 85;
+local sizey = 300;
+local instances_y_add = 45;
 local xoffset = 0;
 local yoffset = 40;
 local alpha = 1;
@@ -25,7 +25,7 @@ local remove_button_size = 12;
 
 local min_x_size = 300;
 
-local min_level = 50;
+local min_level = 60;
 local name_label = "" -- Name
 local mythic_done_label = "Highest M+ done"
 local mythic_keystone_label = "Keystone"
@@ -42,12 +42,19 @@ local nightbane_label = "Nightbane"
 local resources_label = "War Resources"
 local worldboss_label = "Worldboss"
 local conquest_label = "Conquest"
+local conquest_earned_label = "Conquest Cap"
 local islands_label = "Islands"
 local pearls_label = "Manapearls"
 local neck_label = "Neck level"
 local residuum_label = "Residuum"
+local renown_label = "Renown"
+local conduit_charges_label = "Conduit Charges"
+local stygia_label = "Stygia"
+local soul_ash_label = "Soul Ash"
+local reservoir_anima_label = "Stored Anima"
+local torghast_label = "Torghast"
 
-local VERSION = "1.8"
+local VERSION = "2.0"
 
 local function GetCurrencyAmount(id)
 	local info = C_CurrencyInfo.GetCurrencyInfo(id)
@@ -59,18 +66,27 @@ end
 -- C_ChallengeMode.GetMapTable() and names from C_ChallengeMode.GetMapUIInfo(id)
 local dungeons = {
 	-- BFA
-	[244] = "AD",
-	[245] = "FH",
-	[246] = "TD",
-	[247] = "ML",
-	[248] = "WCM",
-	[249] = "KR",
-	[250] = "Seth",
-	[251] = "UR",
-	[252] = "SotS",
-	[353] = "SoB",
-	[369] = "Mech:Junk",
-	[370] = "Mech:Shop",
+	-- [244] = "AD",
+	-- [245] = "FH",
+	-- [246] = "TD",
+	-- [247] = "ML",
+	-- [248] = "WCM",
+	-- [249] = "KR",
+	-- [250] = "Seth",
+	-- [251] = "UR",
+	-- [252] = "SotS",
+	-- [353] = "SoB",
+	-- [369] = "Mech:Junk",
+	-- [370] = "Mech:Shop",
+	-- Shadowlands
+	[375] = "MoTS",
+	[376] = "NW",
+	[377] = "DOS",
+	[378] = "HoA",
+	[379] = "PF",
+	[380] = "SD",
+	[381] = "SoA",
+	[382] = "ToP",
  };
 
 
@@ -219,7 +235,7 @@ function AltManager:PurgeDbShadowlands()
 	if MethodAltManagerDB == nil or MethodAltManagerDB.data == nil then return end
 	local remove = {}
 	for alt_guid, alt_data in spairs(MethodAltManagerDB.data, function(t, a, b) return t[a].ilevel > t[b].ilevel end) do
-		if alt_data.ilevel > 250.0 and alt_data.charlevel == nil then -- poor heuristic to remove old max level chars
+		if alt_data.charlevel == nil or alt_data.charlevel < min_level then -- poor heuristic to remove old max level chars
 			table.insert(remove, alt_guid)
 		end
 	end
@@ -301,25 +317,14 @@ function AltManager:ValidateReset()
 			char_table.expires = self:GetNextWeeklyResetTime();
 			char_table.worldboss = "-";
 			
-			char_table.islands = 0;
-			char_table.islands_finished = false;
+			-- char_table.islands = 0;
+			-- char_table.islands_finished = false;
 			
-			char_table.conquest = 0;
-			char_table.uldir_normal = 0;
-			char_table.uldir_heroic = 0;
-			char_table.uldir_mythic = 0;
+			char_table.conquest_earned = 0;
 
-			char_table.bod_normal = 0;
-			char_table.bod_heroic = 0;
-			char_table.bod_mythic = 0;
-
-			char_table.ep_normal = 0;
-			char_table.ep_heroic = 0;
-			char_table.ep_mythic = 0;
-
-			char_table.nyalotha_normal = 0;
-			char_table.nyalotha_heroic = 0;
-			char_table.nyalotha_mythic = 0;
+			char_table.nathria_normal = 0;
+			char_table.nathria_heroic = 0;
+			char_table.nathria_mythic = 0;
 
 		end
 	end
@@ -413,23 +418,10 @@ function AltManager:RemoveCharacterByGuid(index, skip_confirmation)
 
 end
 
-local get_current_questline_quest = QuestUtils_GetCurrentQuestLineQuest
 
--- function QuestUtils_GetCurrentQuestLineQuest(questLineID)
--- 	local quests = C_QuestLine.GetQuestLineQuests(questLineID);
--- 	local currentQuestID = 0;
--- 	for i, questID in ipairs(quests) do
--- 		if C_QuestLog.IsOnQuest(questID) then
--- 			currentQuestID = questID;
--- 			break;
--- 		end
--- 	end
--- 	return currentQuestID;
--- end
-
-function getConquestCap()
-    local CONQUEST_QUESTLINE_ID = 782;
-    local currentQuestID = get_current_questline_quest(CONQUEST_QUESTLINE_ID);
+function conquest_cap()
+	local CONQUEST_QUESTLINE_ID = 782; -- BFA questline ID = 782
+    local currentQuestID = QuestUtils_GetCurrentQuestLineQuest(CONQUEST_QUESTLINE_ID);
 
     -- if not on a current quest that means all caught up for this week
     if currentQuestID == 0 then
@@ -565,48 +557,31 @@ function AltManager:CollectData(do_artifact)
 		dungeon = "Unknown";
 		level = "?"
 	end
-	
-	if do_artifact and HasArtifactEquipped() then
-		if not ArtifactFrame then
-			LoadAddOn("Blizzard_ArtifactUI");
-		end
-		-- open artifact
-		local is_open = ArtifactFrame:IsShown();
-		if (not ArtifactFrame or not ArtifactFrame:IsShown()) then
-			SocketInventoryItem(INVSLOT_MAINHAND);
-		end
-		artifact_level = C_ArtifactUI.GetArtifactKnowledgeLevel()
-		-- close artifact
-		if not is_open and ArtifactFrame and ArtifactFrame:IsShown() and C_ArtifactUI.IsViewedArtifactEquipped() then
-			C_ArtifactUI.Clear();
-		end
-	end
 
 	-- order resources
-	local order_resources = GetCurrencyAmount(1560);
+	-- local order_resources = GetCurrencyAmount(1560);
 	
-	seals = GetCurrencyAmount(1580);
-	coalescing_visions = GetCurrencyAmount(1755);
+	-- seals = GetCurrencyAmount(1580);
+	seals = 0;
+	-- coalescing_visions = GetCurrencyAmount(1755);
 	
-	seals_bought = 0
-	local gold_1 = C_QuestLog.IsQuestFlaggedCompleted(52834)
-	if gold_1 then seals_bought = seals_bought + 1 end
-	local gold_2 = C_QuestLog.IsQuestFlaggedCompleted(52838)
-	if gold_2 then seals_bought = seals_bought + 1 end
-	local resources_1 = C_QuestLog.IsQuestFlaggedCompleted(52837)
-	if resources_1 then seals_bought = seals_bought + 1 end
-	local resources_2 = C_QuestLog.IsQuestFlaggedCompleted(52840)
-	if resources_2 then seals_bought = seals_bought + 1 end
-	local marks_1 = C_QuestLog.IsQuestFlaggedCompleted(52835)
-	if marks_1 then seals_bought = seals_bought + 1 end
-	local marks_2 = C_QuestLog.IsQuestFlaggedCompleted(52839)
-	if marks_2 then seals_bought = seals_bought + 1 end
+	-- seals_bought = 0
+	-- local gold_1 = C_QuestLog.IsQuestFlaggedCompleted(52834)
+	-- if gold_1 then seals_bought = seals_bought + 1 end
+	-- local gold_2 = C_QuestLog.IsQuestFlaggedCompleted(52838)
+	-- if gold_2 then seals_bought = seals_bought + 1 end
+	-- local resources_1 = C_QuestLog.IsQuestFlaggedCompleted(52837)
+	-- if resources_1 then seals_bought = seals_bought + 1 end
+	-- local resources_2 = C_QuestLog.IsQuestFlaggedCompleted(52840)
+	-- if resources_2 then seals_bought = seals_bought + 1 end
+	-- local marks_1 = C_QuestLog.IsQuestFlaggedCompleted(52835)
+	-- if marks_1 then seals_bought = seals_bought + 1 end
+	-- local marks_2 = C_QuestLog.IsQuestFlaggedCompleted(52839)
+	-- if marks_2 then seals_bought = seals_bought + 1 end
 	
 	
-	local class_hall_seal = C_QuestLog.IsQuestFlaggedCompleted(43510)
-	if class_hall_seal then seals_bought = seals_bought + 1 end
-	
-	local uldir_lfr, uldir_normal, uldir_heroic, uldir_mythic = 0;
+	-- local class_hall_seal = C_QuestLog.IsQuestFlaggedCompleted(43510)
+	-- if class_hall_seal then seals_bought = seals_bought + 1 end
 
 	local saves = GetNumSavedInstances();
 	local normal_difficulty = 14
@@ -616,28 +591,35 @@ function AltManager:CollectData(do_artifact)
 		local name, _, reset, difficulty, _, _, _, _, _, _, bosses, killed_bosses = GetSavedInstanceInfo(i);
 
 		-- check for raids
-		if name == C_Map.GetMapInfo(1148).name and reset > 0 then
-			if difficulty == normal_difficulty then uldir_normal = killed_bosses end
-			if difficulty == heroic_difficulty then uldir_heroic = killed_bosses end
-			if difficulty == mythic_difficulty then uldir_mythic = killed_bosses end
-		end
-		if name == C_Map.GetMapInfo(1352).name and reset > 0 then
-			if difficulty == normal_difficulty then bod_normal = killed_bosses end
-			if difficulty == heroic_difficulty then bod_heroic = killed_bosses end
-			if difficulty == mythic_difficulty then bod_mythic = killed_bosses end
-		end
-		if name == C_Map.GetMapInfo(1512).name and reset > 0 then
-			if difficulty == normal_difficulty then ep_normal = killed_bosses end
-			if difficulty == heroic_difficulty then ep_heroic = killed_bosses end
-			if difficulty == mythic_difficulty then ep_mythic = killed_bosses end
-		end
+		-- if name == C_Map.GetMapInfo(1148).name and reset > 0 then
+		-- 	if difficulty == normal_difficulty then uldir_normal = killed_bosses end
+		-- 	if difficulty == heroic_difficulty then uldir_heroic = killed_bosses end
+		-- 	if difficulty == mythic_difficulty then uldir_mythic = killed_bosses end
+		-- end
+		-- if name == C_Map.GetMapInfo(1352).name and reset > 0 then
+		-- 	if difficulty == normal_difficulty then bod_normal = killed_bosses end
+		-- 	if difficulty == heroic_difficulty then bod_heroic = killed_bosses end
+		-- 	if difficulty == mythic_difficulty then bod_mythic = killed_bosses end
+		-- end
+		-- if name == C_Map.GetMapInfo(1512).name and reset > 0 then
+		-- 	if difficulty == normal_difficulty then ep_normal = killed_bosses end
+		-- 	if difficulty == heroic_difficulty then ep_heroic = killed_bosses end
+		-- 	if difficulty == mythic_difficulty then ep_mythic = killed_bosses end
+		-- end
 		-- hack that may not work for other localizations
 		-- I can't find any reference to the full name in the API, but the saved info returns the full name
-		local nyalotha_lfg_name = GetLFGDungeonInfo(2033)
-		if name == nyalotha_lfg_name and reset > 0 then -- is it okay to use any Nyalotha id? 2217
-			if difficulty == normal_difficulty then nyalotha_normal = killed_bosses end
-			if difficulty == heroic_difficulty then nyalotha_heroic = killed_bosses end
-			if difficulty == mythic_difficulty then nyalotha_mythic = killed_bosses end
+		-- local nyalotha_lfg_name = GetLFGDungeonInfo(2033)
+		-- if name == nyalotha_lfg_name and reset > 0 then -- is it okay to use any Nyalotha id? 2217
+		-- 	if difficulty == normal_difficulty then nyalotha_normal = killed_bosses end
+		-- 	if difficulty == heroic_difficulty then nyalotha_heroic = killed_bosses end
+		-- 	if difficulty == mythic_difficulty then nyalotha_mythic = killed_bosses end
+		-- end
+
+		-- Castle Nathria IDs = {1735, 1744, 1745, 1746, 1747, 1748, 1750, 1755}
+		if name == C_Map.GetMapInfo(1735).name and reset > 0 then
+			if difficulty == normal_difficulty then nathria_normal = killed_bosses end
+			if difficulty == heroic_difficulty then nathria_heroic = killed_bosses end
+			if difficulty == mythic_difficulty then nathria_mythic = killed_bosses end
 		end
 	end
 	
@@ -646,7 +628,7 @@ function AltManager:CollectData(do_artifact)
 	-- /run for i=0,20000 do if C_Map.GetMapInfo(i) then if C_Map.GetMapInfo(i).name == "Ny'alotha, the Waking City" then print(i) end end end
 	-- /run for i=2000,2400 do if GetLFGDungeonInfo(i) then print(i, GetLFGDungeonInfo(i)) end end 
 
-	local worldbossquests = {
+	local world_boss_quests = {
 		[52181] = "T'zane", 
 		[52169] = "Dunegorger Kraulok",
 		[52166] = "Warbringer Yenajz",
@@ -655,83 +637,99 @@ function AltManager:CollectData(do_artifact)
 		[52196]  = "Ji'arak"
 	}
 	local worldboss = "-"
-	for k,v in pairs(worldbossquests)do
+	for k,v in pairs(world_boss_quests)do
 		if C_QuestLog.IsQuestFlaggedCompleted(k) then
 			worldboss = v 
 		end
 	end
 	
-	local conquest = getConquestCap()
+	local conquest_earned = C_WeeklyRewards.GetConquestWeeklyProgress().progress;
+	local conquest_total = C_CurrencyInfo.GetCurrencyInfo(Constants.CurrencyConsts.CONQUEST_CURRENCY_ID).quantity
 	
-	local _, _, _, islands, _ = GetQuestObjectiveInfo(C_IslandsQueue.GetIslandsWeeklyQuestID(), 1, false);
-	local islands_finished = C_QuestLog.IsQuestFlaggedCompleted(C_IslandsQueue.GetIslandsWeeklyQuestID())
+	-- local _, _, _, islands, _ = GetQuestObjectiveInfo(C_IslandsQueue.GetIslandsWeeklyQuestID(), 1, false);
+	-- local islands_finished = C_QuestLog.IsQuestFlaggedCompleted(C_IslandsQueue.GetIslandsWeeklyQuestID())
 
 	
 	local _, ilevel = GetAverageItemLevel();
 
-	local pearls = GetCurrencyAmount(1721);
-	local residuum = GetCurrencyAmount(1718);
-	local echoes = GetCurrencyAmount(1803);
-	local corrupted_mementos = GetCurrencyAmount(1719); -- jebaited with 1744 id, which is probably the "in vision" currency
+	-- local pearls = GetCurrencyAmount(1721);
+	-- local residuum = GetCurrencyAmount(1718);
+	-- local echoes = GetCurrencyAmount(1803);
+	-- local corrupted_mementos = GetCurrencyAmount(1719); -- jebaited with 1744 id, which is probably the "in vision" currency
 
 	-- /run for i=0,20000 do n,a = GetCurrencyInfo(i); if a == 1365 then print(i) end end
+	-- /run for i=0,20000 do n = C_CurrencyInfo.GetCurrencyInfo(i); if n ~= nil and n.name == "Stygia" then print(i) end end
 
-	local location = C_AzeriteItem.FindActiveAzeriteItem()
-	local neck_level
-	if not location then neck_level = 0
-	else neck_level = C_AzeriteItem.GetPowerLevel(location)
-	end
+	-- local location = C_AzeriteItem.FindActiveAzeriteItem()
+	-- local neck_level
+	-- if not location then neck_level = 0
+	-- else neck_level = C_AzeriteItem.GetPowerLevel(location)
+	-- end
 
 	-- store data into a table
 
+	local conduit_charges = C_Soulbinds.GetConduitCharges();
+	local max_conduit_charges = C_Soulbinds.GetConduitChargesCapacity();
+	-- local now = C_DateAndTime.GetCurrentCalendarTime();
+
+	local stygia = GetCurrencyAmount(1767);
+	local soul_ash = GetCurrencyAmount(1828);
+	local stored_anima = GetCurrencyAmount(1813);
+	local renown = C_CovenantSanctumUI.GetRenownLevel();
+
 	local char_table = {}
 	
+	-- hooksecurefunc(C_VignetteInfo, "GetVignettes", function(...) print("GetVignettes", ...); end)
+	-- hooksecurefunc(C_VignetteInfo, "GetVignetteInfo", function(...) print("GetVignetteInfo", ...); end)
+	-- /run for k, v in ipairs(GameTooltip.insertedFrames[1].widgetPools.pools.UIWidgetTemplateTextWithState.activeObjects) do print(k) end
+	-- /tinspect GameTooltip.insertedFrames[1]
+	-- /run VignettePinMixin:OnMouseEnter(); a, b, c, d = GameTooltip.insertedFrames[1]:GetChildren(); print(a.Text:GetText())
+	-- Looks like getting torghast progress with addon API is a nightmare right now
+
 	char_table.guid = UnitGUID('player');
 	char_table.name = name;
 	char_table.class = class;
 	char_table.ilevel = ilevel;
 	char_table.charlevel = UnitLevel('player')
-	char_table.seals = seals;
-	char_table.seals_bought = seals_bought;
-	char_table.vessels = vessels;
-	char_table.coalescing_visions = coalescing_visions;
 	char_table.dungeon = dungeon;
 	char_table.level = level;
 	char_table.highest_mplus = highest_mplus;
 	char_table.worldboss = worldboss;
-	char_table.conquest = conquest;
-	char_table.islands =  islands; 
-	char_table.islands_finished = islands_finished;
-	char_table.pearls = pearls
-	char_table.residuum = residuum
-	char_table.corrupted_mementos = corrupted_mementos
-	char_table.neck_level = neck_level
-	char_table.echoes = echoes
-	
+	char_table.conquest_earned = conquest_earned;
+	char_table.conquest_total = conquest_total;
 
-	char_table.uldir_normal = uldir_normal;
-	char_table.uldir_heroic = uldir_heroic;
-	char_table.uldir_mythic = uldir_mythic;
+	char_table.conduit_charges = conduit_charges;
+	char_table.max_conduit_charges = max_conduit_charges;
+	char_table.stygia = stygia;
+	char_table.soul_ash = soul_ash;
+	char_table.stored_anima = stored_anima;
+	char_table.renown = renown;
 
-	char_table.bod_normal = bod_normal;
-	char_table.bod_heroic = bod_heroic;
-	char_table.bod_mythic = bod_mythic;
+	char_table.nathria_normal = nathria_normal;
+	char_table.nathria_heroic = nathria_heroic;
+	char_table.nathria_mythic = nathria_mythic;
 
-	char_table.ep_normal = ep_normal;
-	char_table.ep_heroic = ep_heroic;
-	char_table.ep_mythic = ep_mythic;
-
-	char_table.nyalotha_normal = nyalotha_normal;
-	char_table.nyalotha_heroic = nyalotha_heroic;
-	char_table.nyalotha_mythic = nyalotha_mythic;
-
-	char_table.order_resources = order_resources;
-	char_table.veiled_argunite = veiled_argunite;
-	char_table.wakening_essence = wakening_essence;
-	char_table.is_depleted = depleted;
+	-- char_table.is_depleted = depleted;
 	char_table.expires = self:GetNextWeeklyResetTime();
+	char_table.data_obtained = time();
+	char_table.time_until_reset = C_DateAndTime.GetSecondsUntilDailyReset();
 	
-	
+	-- old stuff
+	-- char_table.order_resources = order_resources;
+	-- char_table.veiled_argunite = veiled_argunite;
+	-- char_table.wakening_essence = wakening_essence;
+	-- char_table.islands =  islands; 
+	-- char_table.islands_finished = islands_finished;
+	-- char_table.pearls = pearls
+	-- char_table.residuum = residuum
+	-- char_table.corrupted_mementos = corrupted_mementos
+	-- char_table.neck_level = neck_level
+	-- char_table.echoes = echoes
+	-- char_table.seals = seals;
+	-- char_table.seals_bought = seals_bought;
+	-- char_table.vessels = vessels;
+	-- char_table.coalescing_visions = coalescing_visions;
+
 	return char_table;
 end
 
@@ -875,6 +873,17 @@ function AltManager:CloseInstancesUnroll()
 	end
 end
 
+function AltManager:ConduitChargesRegenerated(alt_data)
+	local last_check = alt_data.data_obtained;
+	local next_tick = alt_data.time_until_reset;
+	local now = time();
+
+	local elapsed = now - last_check;
+	local first = elapsed - next_tick;
+	if first < 0 then return 0 end
+	return 1 + (first % (24 * 3600))
+end
+
 function AltManager:CreateContent()
 
 	-- Close button
@@ -893,7 +902,7 @@ function AltManager:CreateContent()
 		},
 		ilevel = {
 			order = 2,
-			data = function(alt_data) return string.format("%.2f (%d)", alt_data.ilevel or 0, alt_data.neck_level or 0) end,
+			data = function(alt_data) return string.format("%.2f", alt_data.ilevel or 0) end, -- , alt_data.neck_level or 0
 			justify = "TOP",
 			font = "Fonts\\FRIZQT__.TTF",
 			remove_button = function(alt_data) return self:CreateRemoveButton(function() AltManager:RemoveCharacterByGuid(alt_data.guid) end) end
@@ -908,56 +917,98 @@ function AltManager:CreateContent()
 			label = mythic_keystone_label,
 			data = function(alt_data) local depleted_string = alt_data.is_depleted and " (D)" or ""; return (dungeons[alt_data.dungeon] or alt_data.dungeon) .. " +" .. tostring(alt_data.level) .. depleted_string; end,
 		},
-		seals_owned = {
-			order = 5,
-			label = seals_owned_label,
-			data = function(alt_data) return tostring(alt_data.seals) end,
-		},
-		seals_bought = {
-			order = 6,
-			label = seals_bought_label,
-			data = function(alt_data) return tostring(alt_data.seals_bought) end,
-		},
+		-- seals_owned = {
+		-- 	order = 5,
+		-- 	label = seals_owned_label,
+		-- 	data = function(alt_data) return tostring(alt_data.seals) end,
+		-- },
+		-- seals_bought = {
+		-- 	order = 6,
+		-- 	label = seals_bought_label,
+		-- 	data = function(alt_data) return tostring(alt_data.seals_bought) end,
+		-- },
 		fake_just_for_offset = {
 			order = 6.1,
 			label = "",
 			data = function(alt_data) return " " end,
 		},
-		vessels = {
+		-- vessels = {
+		-- 	order = 6.5,
+		-- 	label = vessels_of_horrific_visions_label,
+		-- 	data = function(alt_data) return tostring(alt_data.vessels or "0") end,
+		-- },
+		-- coalascing_visions = {
+		-- 	order = 6.6,
+		-- 	label = coalescing_visions_label,
+		-- 	data = function(alt_data) return tostring(alt_data.coalescing_visions or "0") end,
+		-- },
+		-- corrupted_mementos = {
+		-- 	order = 6.7,
+		-- 	label = mementos_label,
+		-- 	data = function(alt_data) return tostring(alt_data.corrupted_mementos or "0") end,
+		-- },
+		-- residuum = {
+		-- 	order = 7,
+		-- 	label = residuum_label,
+		-- 	data = function(alt_data) return alt_data.residuum and tostring(alt_data.residuum) or "0" end,
+		-- },
+		-- echoes = {
+		-- 	order = 7.5,
+		-- 	label = echoes_label,
+		-- 	data = function(alt_data) return alt_data.echoes and tostring(alt_data.echoes) or "0" end,
+		-- },
+
+		-- char_table.conduit_charges = conduit_charges;
+		-- char_table.max_conduit_charges = max_conduit_charges;
+
+		renown = {
+			order = 6.2,
+			label = renown_label,
+			data = function(alt_data) return tostring(alt_data.renown or "?") end,
+		},
+		stygia = {
+			order = 6.4,
+			label = stygia_label,
+			data = function(alt_data) return tostring(alt_data.stygia or "0") end,
+		},
+		soul_ash = {
+			order = 6.3,
+			label = soul_ash_label,
+			data = function(alt_data) return tostring(alt_data.soul_ash or "0") end,
+		},
+		conduit_charges = {
+			order = 6.45,
+			label = conduit_charges_label,
+			data = function(alt_data) local have_charges = alt_data.conduit_charges ~= nil; if have_charges then return tostring(alt_data.conduit_charges + self:ConduitChargesRegenerated(alt_data)) .. " / " .. tostring(alt_data.max_conduit_charges) else return "?" end end
+		},
+		
+		stored_anima = {
 			order = 6.5,
-			label = vessels_of_horrific_visions_label,
-			data = function(alt_data) return tostring(alt_data.vessels or "0") end,
+			label = reservoir_anima_label,
+			data = function(alt_data) return tostring(alt_data.stored_anima or "0") end,
 		},
-		coalascing_visions = {
-			order = 6.6,
-			label = coalescing_visions_label,
-			data = function(alt_data) return tostring(alt_data.coalescing_visions or "0") end,
-		},
-		corrupted_mementos = {
-			order = 6.7,
-			label = mementos_label,
-			data = function(alt_data) return tostring(alt_data.corrupted_mementos or "0") end,
-		},
-		residuum = {
-			order = 7,
-			label = residuum_label,
-			data = function(alt_data) return alt_data.residuum and tostring(alt_data.residuum) or "0" end,
-		},
-		echoes = {
-			order = 7.5,
-			label = echoes_label,
-			data = function(alt_data) return alt_data.echoes and tostring(alt_data.echoes) or "0" end,
+
+		fake_just_for_offset_2 = {
+			order = 6.9,
+			label = "",
+			data = function(alt_data) return " " end,
 		},
 		conquest_cap = {
 			order = 8,
-			label = conquest_label,
-			data = function(alt_data) return (alt_data.conquest and tostring(alt_data.conquest) or "?")  .. "/" .. "500"  end,
+			label = conquest_earned_label,
+			data = function(alt_data) return (alt_data.conquest_earned and tostring(alt_data.conquest_earned) or "?")  end, --   .. "/" .. "500"
 		},
-		order_resources = {
+		conquest_pts = {
 			order = 9,
-			label = resources_label,
-			data = function(alt_data) return alt_data.order_resources and tostring(alt_data.order_resources) or "0" end,
+			label = conquest_label,
+			data = function(alt_data) return (alt_data.conquest_total and tostring(alt_data.conquest_total) or "0")  end,
 		},
+		-- BFA resources
+		-- order_resources = {
+		-- 	order = 9,
+		-- 	label = resources_label,
+		-- 	data = function(alt_data) return alt_data.order_resources and tostring(alt_data.order_resources) or "0" end,
+		-- },
 		-- sort of became irrelevant for now
 		-- pearls = {
 		-- 	order = 9.5,
@@ -970,11 +1021,11 @@ function AltManager:CreateContent()
 		-- 	label = worldboss_label,
 		-- 	data = function(alt_data) return alt_data.worldboss or "?" end,
 		-- },
-		islands = {
-			order = 11,
-			label = islands_label,
-			data = function(alt_data) return (alt_data.islands_finished and "Capped") or ((alt_data.islands and tostring(alt_data.islands)) or "?") .. "/ 36K"  end,
-		},
+		-- islands = {
+		-- 	order = 11,
+		-- 	label = islands_label,
+		-- 	data = function(alt_data) return (alt_data.islands_finished and "Capped") or ((alt_data.islands and tostring(alt_data.islands)) or "?") .. "/ 36K"  end,
+		-- },
 		dummy_line = {
 			order = 12,
 			label = " ",
@@ -1002,24 +1053,9 @@ function AltManager:CreateContent()
 			rows = {
 				uldir = {
 					order = 4,
-					label = "Uldir",
-					data = function(alt_data) return self:MakeRaidString(alt_data.uldir_normal, alt_data.uldir_heroic, alt_data.uldir_mythic) end
+					label = "Castle Nathria",
+					data = function(alt_data) return self:MakeRaidString(alt_data.nathria_normal, alt_data.nathria_heroic, alt_data.nathria_mythic) end
 				},
-				dazaralor = {
-					order = 3,
-					label = "Battle for Dazar'alor",
-					data = function(alt_data) return self:MakeRaidString(alt_data.bod_normal, alt_data.bod_heroic, alt_data.bod_mythic) end
-				},
-				eternal_palace = {
-					order = 2,
-					label = "The Eternal Palace",
-					data = function(alt_data) return self:MakeRaidString(alt_data.ep_normal, alt_data.ep_heroic, alt_data.ep_mythic) end
-				},
-				nyalotha = {
-					order = 1,
-					label = "Ny'alotha",
-					data = function(alt_data) return self:MakeRaidString(alt_data.nyalotha_normal, alt_data.nyalotha_heroic, alt_data.nyalotha_mythic) end
-				}
 			}
 		}
 	}
