@@ -11,7 +11,7 @@ _G["AltManager"] = AltManager;
 local Dialog = LibStub("LibDialog-1.0")
 
 --local sizey = 200;
-local sizey = 300;
+local sizey = 320;
 local instances_y_add = 45;
 local xoffset = 0;
 local yoffset = 40;
@@ -27,7 +27,8 @@ local min_x_size = 300;
 
 local min_level = 60;
 local name_label = "" -- Name
-local mythic_done_label = "Highest M+ done"
+local mythic_done_label = "Highest M+"
+local mythic_rewards_label = "M+ Rewards"
 local mythic_keystone_label = "Keystone"
 local seals_owned_label = "BfA Seals owned"
 local seals_bought_label = "Seals obtained"
@@ -40,9 +41,9 @@ local artifact_research_time_label = "Next level in"
 local depleted_label = "Depleted"
 local nightbane_label = "Nightbane"
 local resources_label = "War Resources"
-local worldboss_label = "Worldboss"
+local worldboss_label = "World Boss"
 local conquest_label = "Conquest"
-local conquest_earned_label = "Conquest Cap"
+local conquest_earned_label = "Conquest Earned"
 local islands_label = "Islands"
 local pearls_label = "Manapearls"
 local neck_label = "Neck level"
@@ -54,7 +55,7 @@ local soul_ash_label = "Soul Ash"
 local reservoir_anima_label = "Stored Anima"
 local torghast_label = "Torghast"
 
-local VERSION = "2.0"
+local VERSION = "2.1"
 
 local function GetCurrencyAmount(id)
 	local info = C_CurrencyInfo.GetCurrencyInfo(id)
@@ -312,16 +313,10 @@ function AltManager:ValidateReset()
 			char_table.seals_bought = 0;
 			char_table.dungeon = "Unknown";
 			char_table.level = "?";
-			char_table.highest_mplus = 0;
-			char_table.is_depleted = false;
+			char_table.run_history = 0;
 			char_table.expires = self:GetNextWeeklyResetTime();
-			char_table.worldboss = "-";
+			char_table.worldboss = false;
 			
-			-- char_table.islands = 0;
-			-- char_table.islands_finished = false;
-			
-			char_table.conquest_earned = 0;
-
 			char_table.nathria_normal = 0;
 			char_table.nathria_heroic = 0;
 			char_table.nathria_mythic = 0;
@@ -510,7 +505,9 @@ function AltManager:CollectData(do_artifact)
 	
 	C_MythicPlus.RequestRewards();
 	-- try the new api
-	highest_mplus = C_MythicPlus.GetWeeklyChestRewardLevel()
+	-- highest_mplus = C_MythicPlus.GetWeeklyChestRewardLevel()
+
+	local run_history = C_MythicPlus.GetRunHistory();
 	
 	--[[for k,v in pairs(dungeons) do
 		C_MythicPlus.RequestMapInfo(k);
@@ -534,7 +531,7 @@ function AltManager:CollectData(do_artifact)
 			if slotItemID == 173363 then
 				vessels = vessels + 1
 			end
-			if slotItemID == 158923 then
+			if slotItemID == 180653 then
 				local itemString = slotLink:match("|Hkeystone:([0-9:]+)|h(%b[])|h")
 				local info = { strsplit(":", itemString) }
 				dungeon = tonumber(info[2])
@@ -629,22 +626,26 @@ function AltManager:CollectData(do_artifact)
 	-- /run for i=2000,2400 do if GetLFGDungeonInfo(i) then print(i, GetLFGDungeonInfo(i)) end end 
 
 	local world_boss_quests = {
-		[52181] = "T'zane", 
-		[52169] = "Dunegorger Kraulok",
-		[52166] = "Warbringer Yenajz",
-		[52163] = "Azurethos",
-		[52157] = "Hailstone Construct",
-		[52196]  = "Ji'arak"
+		[61813] = "Valinor",
+		[61814] = "Nurgash", -- THIS IS A GUESS!
+		[61815] = "Oranomoros",
+		[61816] = "Mortanis", 
 	}
-	local worldboss = "-"
+	local worldboss = false
 	for k,v in pairs(world_boss_quests)do
 		if C_QuestLog.IsQuestFlaggedCompleted(k) then
-			worldboss = v 
+			worldboss = v
 		end
 	end
 	
-	local conquest_earned = C_WeeklyRewards.GetConquestWeeklyProgress().progress;
-	local conquest_total = C_CurrencyInfo.GetCurrencyInfo(Constants.CurrencyConsts.CONQUEST_CURRENCY_ID).quantity
+	-- local conquest_earned = C_WeeklyRewards.GetConquestWeeklyProgress().progress;
+
+	-- this is how the official pvp ui does it, so if its wrong.. sue me
+	local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(Constants.CurrencyConsts.CONQUEST_CURRENCY_ID);
+	local maxProgress = currencyInfo.maxQuantity;
+	local conquest_earned = math.min(currencyInfo.totalEarned, maxProgress);
+	local conquest_total = currencyInfo.quantity
+	local conquest_max = maxProgress;
 	
 	-- local _, _, _, islands, _ = GetQuestObjectiveInfo(C_IslandsQueue.GetIslandsWeeklyQuestID(), 1, false);
 	-- local islands_finished = C_QuestLog.IsQuestFlaggedCompleted(C_IslandsQueue.GetIslandsWeeklyQuestID())
@@ -693,7 +694,7 @@ function AltManager:CollectData(do_artifact)
 	char_table.charlevel = UnitLevel('player')
 	char_table.dungeon = dungeon;
 	char_table.level = level;
-	char_table.highest_mplus = highest_mplus;
+	char_table.run_history = run_history;
 	char_table.worldboss = worldboss;
 	char_table.conquest_earned = conquest_earned;
 	char_table.conquest_total = conquest_total;
@@ -709,7 +710,6 @@ function AltManager:CollectData(do_artifact)
 	char_table.nathria_heroic = nathria_heroic;
 	char_table.nathria_mythic = nathria_mythic;
 
-	-- char_table.is_depleted = depleted;
 	char_table.expires = self:GetNextWeeklyResetTime();
 	char_table.data_obtained = time();
 	char_table.time_until_reset = C_DateAndTime.GetSecondsUntilDailyReset();
@@ -884,6 +884,49 @@ function AltManager:ConduitChargesRegenerated(alt_data)
 	return 1 + (first % (24 * 3600))
 end
 
+function AltManager:ProduceRelevantMythics(run_history)
+	-- find thresholds
+	local weekly_info = C_WeeklyRewards.GetActivities(Enum.WeeklyRewardChestThresholdType.MythicPlus);
+	table.sort(run_history, function(left, right) return left.level > right.level; end);
+	local thresholds = {}
+
+	local max_threshold = 0
+	for i = 1 , #weekly_info do
+		thresholds[weekly_info[i].threshold] = true;
+		if weekly_info[i].threshold > max_threshold then
+			max_threshold = weekly_info[i].threshold;
+		end
+	end
+	return run_history, thresholds, max_threshold
+end
+
+function AltManager:MythicRunHistoryString(alt_data)
+	if alt_data.run_history == nil or next(alt_data.run_history) == nil then
+		return "None"
+	end
+	local sorted_history, thresholds, max_threshold = AltManager:ProduceRelevantMythics(alt_data.run_history);
+	local result = "{"
+	local first = true;
+	for run = 1, max_threshold do
+		if #sorted_history >= run then
+			if first then result = result .. " " end
+			if not first then result = result .. ", " end
+			
+			if thresholds[run] then
+				result = result .. "|cFF00FF00"
+			end
+			result = result .. tostring(sorted_history[run].level)
+			if thresholds[run] then
+				result = result .. "|r"
+			end
+
+			first = false;
+		end	
+	end
+	result = result .. " }"
+	return result
+end
+
 function AltManager:CreateContent()
 
 	-- Close button
@@ -910,12 +953,12 @@ function AltManager:CreateContent()
 		mplus = {
 			order = 3,
 			label = mythic_done_label,
-			data = function(alt_data) return tostring(alt_data.highest_mplus) end, 
+			data = function(alt_data) return self:MythicRunHistoryString(alt_data) end, 
 		},
 		keystone = {
 			order = 4,
 			label = mythic_keystone_label,
-			data = function(alt_data) local depleted_string = alt_data.is_depleted and " (D)" or ""; return (dungeons[alt_data.dungeon] or alt_data.dungeon) .. " +" .. tostring(alt_data.level) .. depleted_string; end,
+			data = function(alt_data) return (dungeons[alt_data.dungeon] or alt_data.dungeon) .. " +" .. tostring(alt_data.level); end,
 		},
 		-- seals_owned = {
 		-- 	order = 5,
@@ -979,7 +1022,7 @@ function AltManager:CreateContent()
 		conduit_charges = {
 			order = 6.45,
 			label = conduit_charges_label,
-			data = function(alt_data) local have_charges = alt_data.conduit_charges ~= nil; if have_charges then return tostring(alt_data.conduit_charges + self:ConduitChargesRegenerated(alt_data)) .. " / " .. tostring(alt_data.max_conduit_charges) else return "?" end end
+			data = function(alt_data) local have_charges = alt_data.conduit_charges ~= nil; if have_charges then return tostring( min(alt_data.conduit_charges + self:ConduitChargesRegenerated(alt_data), alt_data.max_conduit_charges)) .. " / " .. tostring(alt_data.max_conduit_charges) else return "?" end end
 		},
 		
 		stored_anima = {
@@ -993,16 +1036,22 @@ function AltManager:CreateContent()
 			label = "",
 			data = function(alt_data) return " " end,
 		},
-		conquest_cap = {
-			order = 8,
-			label = conquest_earned_label,
-			data = function(alt_data) return (alt_data.conquest_earned and tostring(alt_data.conquest_earned) or "?")  end, --   .. "/" .. "500"
+		worldbosses = {
+			order = 7.9,
+			label = worldboss_label,
+			data = function(alt_data) return alt_data.worldboss and (alt_data.worldboss .. " killed") or "-" end,
 		},
 		conquest_pts = {
-			order = 9,
+			order = 8,
 			label = conquest_label,
 			data = function(alt_data) return (alt_data.conquest_total and tostring(alt_data.conquest_total) or "0")  end,
 		},
+		conquest_cap = {
+			order = 9,
+			label = conquest_earned_label,
+			data = function(alt_data) return (alt_data.conquest_earned and (tostring(alt_data.conquest_earned) .. " / " .. C_CurrencyInfo.GetCurrencyInfo(Constants.CurrencyConsts.CONQUEST_CURRENCY_ID).maxQuantity) or "?")  end, --   .. "/" .. "500"
+		},
+
 		-- BFA resources
 		-- order_resources = {
 		-- 	order = 9,
@@ -1016,11 +1065,7 @@ function AltManager:CreateContent()
 		-- 	data = function(alt_data) return alt_data.pearls and tostring(alt_data.pearls) or "0" end,
 		-- },
 
-		-- worldbosses = {
-		-- 	order = 10,
-		-- 	label = worldboss_label,
-		-- 	data = function(alt_data) return alt_data.worldboss or "?" end,
-		-- },
+
 		-- islands = {
 		-- 	order = 11,
 		-- 	label = islands_label,
