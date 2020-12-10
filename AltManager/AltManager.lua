@@ -503,7 +503,18 @@ function AltManager:CollectData(do_artifact)
 		mine_old = MethodAltManagerDB.data[guid];
 	end
 	
-	C_MythicPlus.RequestRewards();
+	-- C_MythicPlus.RequestRewards();
+	C_MythicPlus.RequestCurrentAffixes();
+	C_MythicPlus.RequestMapInfo();
+	for k,v in pairs(dungeons) do
+		-- request info in advance
+		C_MythicPlus.RequestMapInfo(k);
+	end
+	local maps = C_ChallengeMode.GetMapTable();
+	for i = 1, #maps do
+        C_ChallengeMode.RequestLeaders(maps[i]);
+    end
+
 	-- try the new api
 	-- highest_mplus = C_MythicPlus.GetWeeklyChestRewardLevel()
 
@@ -918,6 +929,9 @@ function AltManager:MythicRunHistoryString(alt_data)
 			result = result .. tostring(sorted_history[run].level)
 			if thresholds[run] then
 				result = result .. "|r"
+			end
+			if run == 5 and #sorted_history > 5 then
+				result = result .. "\n"
 			end
 
 			first = false;
