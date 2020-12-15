@@ -3,7 +3,7 @@ local _, AltManager = ...;
 
 _G["AltManager"] = AltManager;
 
--- Made by: Qooning - Tarren Mill <Method>, 2017-2020
+-- Made by: Qooning - Tarren Mill, 2017-2020
 -- Previously Method Alt Manager
 -- updates for Bfa by: Kabootzey - Tarren Mill <Ended Careers>, 2018
 -- Last edit: 14/10/2020
@@ -55,7 +55,7 @@ local soul_ash_label = "Soul Ash"
 local reservoir_anima_label = "Stored Anima"
 local torghast_label = "Torghast"
 
-local VERSION = "2.1"
+local VERSION = "2.6.1"
 
 local function GetCurrencyAmount(id)
 	local info = C_CurrencyInfo.GetCurrencyInfo(id)
@@ -518,7 +518,7 @@ function AltManager:CollectData(do_artifact)
 	-- try the new api
 	-- highest_mplus = C_MythicPlus.GetWeeklyChestRewardLevel()
 
-	local run_history = C_MythicPlus.GetRunHistory();
+	local run_history = C_MythicPlus.GetRunHistory(false, true);
 	
 	--[[for k,v in pairs(dungeons) do
 		C_MythicPlus.RequestMapInfo(k);
@@ -922,16 +922,16 @@ function AltManager:MythicRunHistoryString(alt_data)
 		if #sorted_history >= run then
 			if first then result = result .. " " end
 			if not first then result = result .. ", " end
-			
+			if run == 6 and #sorted_history > 5 then
+				result = result .. "\n"
+			end
+
 			if thresholds[run] then
 				result = result .. "|cFF00FF00"
 			end
 			result = result .. tostring(sorted_history[run].level)
 			if thresholds[run] then
 				result = result .. "|r"
-			end
-			if run == 5 and #sorted_history > 5 then
-				result = result .. "\n"
 			end
 
 			first = false;
