@@ -1053,7 +1053,7 @@ function AltManager:CreateContent()
 		worldbosses = {
 			order = 7.9,
 			label = worldboss_label,
-			data = function(alt_data) return alt_data.worldboss and (alt_data.worldboss .. " killed") or "-" end,
+			data = function(alt_data) return alt_data.worldboss and ("|cFF00FF00" .. alt_data.worldboss) or "-" end,
 		},
 		conquest_pts = {
 			order = 8,
